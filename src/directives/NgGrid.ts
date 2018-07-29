@@ -1,12 +1,10 @@
 import { Directive, ElementRef, Renderer, EventEmitter, ComponentFactoryResolver, ComponentRef, KeyValueDiffer, KeyValueDiffers, OnInit, OnDestroy, DoCheck, Output } from "@angular/core";
-import { Observable } from "rxjs/Observable";
-import { Subscription } from "rxjs/Subscription";
+import { Observable, Subscription, fromEvent as observableFromEvent } from "rxjs";
+
 import { NgGridPlaceholder } from "../components/NgGridPlaceholder";
 import { NgGridHelper } from "../helpers/NgGridHelper";
 import { NgGridConfig, NgGridItemEvent, NgGridItemPosition, NgGridItemSize, NgGridRawPosition, NgGridItemDimensions, NgConfigFixDirection } from "../interfaces/INgGrid";
 import { NgGridItem } from "./NgGridItem";
-
-import "rxjs/add/observable/fromEvent";
 
 @Directive({
 	host: {
@@ -70,7 +68,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _placeholderRef: ComponentRef<NgGridPlaceholder> = null;
 	private _fixToGrid: boolean = false;
 	private _autoResize: boolean = false;
-	private _differ: KeyValueDiffer;
+	private _differ: KeyValueDiffer<string, any>;
 	private _destroyed: boolean = false;
 	private _maintainRatio: boolean = false;
 	private _aspectRatio: number;
@@ -90,8 +88,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _lastZValue: number = 1;
 
 	// Events
-	private _documentMousemove$: Observable<MouseEvent>;
-	private _documentMouseup$: Observable<MouseEvent>;
+	private _documentMousemove$: Observable<Event>;
+	private _documentMouseup$: Observable<Event>;
 	private _mousedown$: Observable<MouseEvent>;
 	private _mousemove$: Observable<MouseEvent>;
 	private _mouseup$: Observable<MouseEvent>;
@@ -144,7 +142,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		this.setConfig(v);
 
 		if (this._differ == null && v != null) {
-			this._differ = this._differs.find(this._config).create(null);
+			this._differ = this._differs.find(this._config).create();
 		}
 
 		this._differ.diff(this._config);
@@ -186,11 +184,11 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		this._config = config;
 
 		let maxColRowChanged = false;
-		for (let x in config) {
+		for (const x in config) {
 			if (!(x in config)) continue;
 
-			let val = config[x];
-			let intVal = !val ? 0 : parseInt(val, 10);
+			const val = config[x];
+			const intVal = !val ? 0 : parseInt(val, 10);
 
 			// tslint:disable-next-line:switch-default
 			switch (x) {
@@ -284,6 +282,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		}
 
 		if (this._allowOverlap && this.cascade !== "off" && this.cascade !== "") {
+			// tslint:disable-next-line:no-console
 			console.warn("Unable to overlap items when a cascade direction is set.");
 			this._allowOverlap = false;
 		}
@@ -346,8 +345,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		this._calculateColWidth();
 		this._calculateRowHeight();
 
-		let maxWidth = this._maxCols * this.colWidth;
-		let maxHeight = this._maxRows * this.rowHeight;
+		const maxWidth = this._maxCols * this.colWidth;
+		const maxHeight = this._maxRows * this.rowHeight;
 
 		if (maxWidth > 0 && this.minWidth > maxWidth) this.minWidth = 0.75 * this.colWidth;
 		if (maxHeight > 0 && this.minHeight > maxHeight) this.minHeight = 0.75 * this.rowHeight;
@@ -384,7 +383,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 
 	public ngDoCheck(): boolean {
 		if (this._differ != null) {
-			let changes = this._differ.diff(this._config);
+			const changes = this._differ.diff(this._config);
 
 			if (changes != null) {
 				this._applyChanges(changes);
@@ -471,7 +470,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 
 	public triggerCascade(): Promise<void> {
 		if (!this._cascadePromise) {
-			this._cascadePromise = new Promise((resolve: Function) => {
+			this._cascadePromise = new Promise((resolve: () => void) => {
 				setTimeout(() => {
 					this._cascadePromise = null;
 					this._cascadeGrid(null, null);
@@ -518,8 +517,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	}
 
 	public mouseDownEventHandler(e: MouseEvent | TouchEvent): void {
-		let mousePos = this._getMousePosition(e);
-		let item = this._getItemFromPosition(mousePos);
+		const mousePos = this._getMousePosition(e);
+		const item = this._getItemFromPosition(mousePos);
 
 		if (item == null) return;
 
@@ -542,7 +541,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		}
 	}
 
-	public mouseUpEventHandler(e: MouseEvent | TouchEvent): void {
+	public mouseUpEventHandler(e: MouseEvent | TouchEvent | Event): void {
 		if (this.isDragging) {
 			this._dragStop(e);
 		} else if (this.isResizing) {
@@ -553,7 +552,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		}
 	}
 
-	public mouseMoveEventHandler(e: MouseEvent | TouchEvent): void {
+	public mouseMoveEventHandler(e: MouseEvent | TouchEvent | Event): void {
 		if (this._resizeReady) {
 			this._resizeStart(e);
 			e.preventDefault();
@@ -569,8 +568,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		} else if (this.isResizing) {
 			this._resize(e);
 		} else {
-			let mousePos = this._getMousePosition(e);
-			let item = this._getItemFromPosition(mousePos);
+			const mousePos = this._getMousePosition(e);
+			const item = this._getItemFromPosition(mousePos);
 
 			if (item) {
 				item.onMouseMove(e);
@@ -592,8 +591,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	}
 	private _updatePositionsAfterMaxChange(): void {
 		this._items.forEach((item: NgGridItem) => {
-			let pos = item.getGridPosition();
-			let dims = item.getSize();
+			const pos = item.getGridPosition();
+			const dims = item.getSize();
 
 			if (!this._hasGridCollision(pos, dims) && this._isWithinBounds(pos, dims) && dims.x <= this._maxCols && dims.y <= this._maxRows) {
 				return;
@@ -610,7 +609,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 			}
 
 			if (this._hasGridCollision(pos, dims) || !this._isWithinBounds(pos, dims, true)) {
-				let newPosition = this._fixGridPosition(pos, dims);
+				const newPosition = this._fixGridPosition(pos, dims);
 				item.setGridPosition(newPosition);
 			}
 
@@ -621,8 +620,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _calculateColWidth(): void {
 		if (this._autoResize) {
 			if (this._maxCols > 0 || this._visibleCols > 0) {
-				let maxCols = this._maxCols > 0 ? this._maxCols : this._visibleCols;
-				let maxWidth: number = this._ngEl.nativeElement.getBoundingClientRect().width;
+				const maxCols = this._maxCols > 0 ? this._maxCols : this._visibleCols;
+				const maxWidth: number = this._ngEl.nativeElement.getBoundingClientRect().width;
 
 				let colWidth: number = Math.floor(maxWidth / maxCols);
 				colWidth -= (this.marginLeft + this.marginRight);
@@ -639,7 +638,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _calculateRowHeight(): void {
 		if (this._autoResize) {
 			if (this._maxRows > 0 || this._visibleRows > 0) {
-				let maxRows = this._maxRows > 0 ? this._maxRows : this._visibleRows;
+				const maxRows = this._maxRows > 0 ? this._maxRows : this._visibleRows;
 				let maxHeight: number;
 
 				if (this._elementBasedDynamicRowHeight) {
@@ -748,17 +747,17 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 			} else if (window.getSelection().removeAllRanges) {
 				window.getSelection().removeAllRanges();
 			}
-		} else if ((<any> document).selection) {
-			(<any> document).selection.empty();
+		} else if ((document as any).selection) {
+			(document as any).selection.empty();
 		}
 
-		let mousePos = this._getMousePosition(e);
-		let newL = (mousePos.left - this._posOffset.left);
-		let newT = (mousePos.top - this._posOffset.top);
+		const mousePos = this._getMousePosition(e);
+		const newL = (mousePos.left - this._posOffset.left);
+		const newT = (mousePos.top - this._posOffset.top);
 
-		let itemPos = this._draggingItem.getGridPosition();
+		const itemPos = this._draggingItem.getGridPosition();
 		let gridPos = this._calculateGridPosition(newL, newT);
-		let dims = this._draggingItem.getSize();
+		const dims = this._draggingItem.getSize();
 
 		gridPos = this._fixPosToBoundsX(gridPos, dims);
 
@@ -793,8 +792,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 			} else if (window.getSelection().removeAllRanges) {
 				window.getSelection().removeAllRanges();
 			}
-		} else if ((<any> document).selection) {
-			(<any> document).selection.empty();
+		} else if ((document as any).selection) {
+			(document as any).selection.empty();
 		}
 
 		const mousePos = this._getMousePosition(e);
@@ -887,7 +886,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 
 		this.isDragging = false;
 
-		let itemPos = this._draggingItem.getGridPosition();
+		const itemPos = this._draggingItem.getGridPosition();
 
 		this._draggingItem.setGridPosition(itemPos);
 		this._addToGrid(this._draggingItem);
@@ -973,7 +972,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	}
 
 	private _hasGridCollision(pos: NgGridItemPosition, dims: NgGridItemSize): boolean {
-		let positions = this._getCollisions(pos, dims);
+		const positions = this._getCollisions(pos, dims);
 
 		if (positions == null || positions.length === 0) return false;
 
@@ -1023,12 +1022,12 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		const collisions: NgGridItem[] = this._getCollisions(pos, dims);
 		if (collisions.length === 0) { return; }
 
-		for (let collision of collisions) {
+		for (const collision of collisions) {
 			this._removeFromGrid(collision);
 
 			const itemDims: NgGridItemSize = collision.getSize();
 			const itemPos: NgGridItemPosition = collision.getGridPosition();
-			let newItemPos: NgGridItemPosition = { col: itemPos.col, row: itemPos.row };
+			const newItemPos: NgGridItemPosition = { col: itemPos.col, row: itemPos.row };
 
 			if (this._collisionFixDirection === "vertical") {
 				newItemPos.row = pos.row + dims.y;
@@ -1077,7 +1076,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 				itemsInGrid = itemsInGrid.sort(NgGridHelper.sortItemsByPositionVertical);
 				const lowestRowPerColumn: Map<number, number> = new Map<number, number>();
 
-				for (let item of itemsInGrid) {
+				for (const item of itemsInGrid) {
 					if (item.isFixed) continue;
 
 					const itemDims: NgGridItemSize = item.getSize();
@@ -1127,14 +1126,14 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 				itemsInGrid = itemsInGrid.sort(NgGridHelper.sortItemsByPositionHorizontal);
 				const lowestColumnPerRow: Map<number, number> = new Map<number, number>();
 
-				for (let item of itemsInGrid) {
+				for (const item of itemsInGrid) {
 					const itemDims: NgGridItemSize = item.getSize();
 					const itemPos: NgGridItemPosition = item.getGridPosition();
 
 					let lowestColumnForItem: number = lowestColumnPerRow.get(itemPos.row) || 1;
 
 					for (let i: number = 1; i < itemDims.y; i++) {
-						let lowestOffsetColumn: number = lowestColumnPerRow.get(itemPos.row + i) || 1;
+						const lowestOffsetColumn: number = lowestColumnPerRow.get(itemPos.row + i) || 1;
 						lowestColumnForItem = Math.max(lowestOffsetColumn, lowestColumnForItem);
 					}
 
@@ -1230,7 +1229,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 				//	Luckily, we can push it down as far as we like as maxAllowedRows *must* be 0
 				for (; newPos.row <= maxUsedRows; ) {
 					const itemsInPath = this._getItemsInHorizontalPath(newPos, dims, newPos.col);
-					let nextCol = this._getNextFittingCol(newPos, dims, itemsInPath);
+					const nextCol = this._getNextFittingCol(newPos, dims, itemsInPath);
 
 					//	See if the item will fit somewhere in this column
 					if (maxAllowedCols - nextCol >= dims.x) {
@@ -1251,7 +1250,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _getNextFittingRow(newPos: NgGridItemPosition, dims: NgGridItemSize, itemsInPath: NgGridItem[]): number {
 		let nextRow = newPos.row;
 
-		for (let item of itemsInPath) {
+		for (const item of itemsInPath) {
 			//	Will our item fit in this column between the last item and this one?
 			if (item.row - nextRow >= dims.y) {
 				return nextRow;
@@ -1267,7 +1266,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _getNextFittingCol(newPos: NgGridItemPosition, dims: NgGridItemSize, itemsInPath: NgGridItem[]): number {
 		let nextCol = newPos.col;
 
-		for (let item of itemsInPath) {
+		for (const item of itemsInPath) {
 			//	Will our item fit in this row between the last item and this one?
 			if (item.col - nextCol >= dims.x) {
 				return nextCol;
@@ -1384,8 +1383,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 
 	private _updateSize(): void {
 		if (this._destroyed) return;
-		let maxCol: number = this._getMaxCol();
-		let maxRow: number = this._getMaxRow();
+		const maxCol: number = this._getMaxCol();
+		const maxRow: number = this._getMaxRow();
 
 		if (maxCol !== this._curMaxCol || maxRow !== this._curMaxRow) {
 			this._curMaxCol = maxCol;
@@ -1419,7 +1418,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	}
 
 	private _getMousePosition(e: any): NgGridRawPosition {
-		if (((<any> window).TouchEvent && e instanceof TouchEvent) || (e.touches || e.changedTouches)) {
+		if (((window as any).TouchEvent && e instanceof TouchEvent) || (e.touches || e.changedTouches)) {
 			e = e.touches.length > 0 ? e.touches[0] : e.changedTouches[0];
 		}
 
@@ -1443,7 +1442,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	}
 
 	private _getAbsoluteMousePosition(e: any): NgGridRawPosition {
-		if (((<any> window).TouchEvent && e instanceof TouchEvent) || (e.touches || e.changedTouches)) {
+		if (((window as any).TouchEvent && e instanceof TouchEvent) || (e.touches || e.changedTouches)) {
 			e = e.touches.length > 0 ? e.touches[0] : e.changedTouches[0];
 		}
 
@@ -1467,7 +1466,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _getScreenMargin(): number {
 		const maxWidth: number = this._ngEl.nativeElement.getBoundingClientRect().width;
 		const itemWidth: number = this.colWidth + this.marginLeft + this.marginRight;
-		return Math.floor((maxWidth - (this._maxCols * itemWidth)) / 2); ;
+		return Math.floor((maxWidth - (this._maxCols * itemWidth)) / 2);
 	}
 
 	private _getItemFromPosition(position: NgGridRawPosition): NgGridItem {
@@ -1481,7 +1480,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 
 				// tslint:disable-next-line:indent
 				return position.left >= pos.left && position.left < (pos.left + size.width) &&
-				       position.top >= pos.top && position.top < (pos.top + size.height);
+							position.top >= pos.top && position.top < (pos.top + size.height);
 			});
 	}
 
@@ -1490,7 +1489,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 		const dims: NgGridItemSize = item.getSize();
 
 		const factory = this.componentFactoryResolver.resolveComponentFactory(NgGridPlaceholder);
-		let componentRef: ComponentRef<NgGridPlaceholder> = item.containerRef.createComponent(factory);
+		const componentRef: ComponentRef<NgGridPlaceholder> = item.containerRef.createComponent(factory);
 		this._placeholderRef = componentRef;
 		const placeholder: NgGridPlaceholder = componentRef.instance;
 		placeholder.registerGrid(this);
@@ -1511,14 +1510,14 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	private _defineListeners(): void {
 		const element = this._ngEl.nativeElement;
 
-		this._documentMousemove$ = Observable.fromEvent(document, "mousemove");
-		this._documentMouseup$ = Observable.fromEvent(document, "mouseup");
-		this._mousedown$ = Observable.fromEvent(element, "mousedown");
-		this._mousemove$ = Observable.fromEvent(element, "mousemove");
-		this._mouseup$ = Observable.fromEvent(element, "mouseup");
-		this._touchstart$ = Observable.fromEvent(element, "touchstart");
-		this._touchmove$ = Observable.fromEvent(element, "touchmove");
-		this._touchend$ = Observable.fromEvent(element, "touchend");
+		this._documentMousemove$ = observableFromEvent(document, "mousemove");
+		this._documentMouseup$ = observableFromEvent(document, "mouseup");
+		this._mousedown$ = observableFromEvent(element, "mousedown");
+		this._mousemove$ = observableFromEvent(element, "mousemove");
+		this._mouseup$ = observableFromEvent(element, "mouseup");
+		this._touchstart$ = observableFromEvent(element, "touchstart");
+		this._touchmove$ = observableFromEvent(element, "touchmove");
+		this._touchend$ = observableFromEvent(element, "touchend");
 	}
 
 	private _enableListeners(): void {
@@ -1542,7 +1541,7 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 
 	private _isTouchDevice(): boolean {
 		return "ontouchstart" in window || navigator.maxTouchPoints > 0;
-	};
+	}
 
 	private _enableTouchListeners(): void {
 		const touchstartSubs = this._touchstart$.subscribe((e: TouchEvent) => this.mouseDownEventHandler(e));
@@ -1557,8 +1556,8 @@ export class NgGrid implements OnInit, DoCheck, OnDestroy {
 	}
 
 	private _enableMouseListeners(): void {
-		const documentMousemoveSubs = this._documentMousemove$.subscribe((e: MouseEvent) => this.mouseMoveEventHandler(e));
-		const documentMouseupSubs = this._documentMouseup$.subscribe((e: MouseEvent) => this.mouseUpEventHandler(e));
+		const documentMousemoveSubs = this._documentMousemove$.subscribe((e: Event) => this.mouseMoveEventHandler(e));
+		const documentMouseupSubs = this._documentMouseup$.subscribe((e: Event) => this.mouseUpEventHandler(e));
 		const mousedownSubs = this._mousedown$.subscribe((e: MouseEvent) => this.mouseDownEventHandler(e));
 		const mousemoveSubs = this._mousemove$.subscribe((e: MouseEvent) => this.mouseMoveEventHandler(e));
 		const mouseupSubs = this._mouseup$.subscribe((e: MouseEvent) => this.mouseUpEventHandler(e));

@@ -63,7 +63,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 	private _elemLeft: number;
 	private _elemTop: number;
 	private _added: boolean = false;
-	private _differ: KeyValueDiffer;
+	private _differ: KeyValueDiffer<string, any>;
 	private _cascadeMode: string;
 	private _maxCols: number = 0;
 	private _minCols: number = 0;
@@ -86,7 +86,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 		this._userConfig = v;
 
 		const configObject = Object.assign({}, NgGridItem.CONST_DEFAULT_CONFIG, v);
-		for (let x in NgGridItem.CONST_DEFAULT_CONFIG)
+		for (const x in NgGridItem.CONST_DEFAULT_CONFIG)
 			if (configObject[x] == null)
 				configObject[x] = NgGridItem.CONST_DEFAULT_CONFIG[x];
 
@@ -94,7 +94,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 
 		if (this._userConfig != null) {
 			if (this._differ == null) {
-				this._differ = this._differs.find(this._userConfig).create(null);
+				this._differ = this._differs.find(this._userConfig).create();
 			}
 
 			this._differ.diff(this._userConfig);
@@ -239,7 +239,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 
 			if (typeof this._resizeHandle !== "object") return null;
 
-			for (let direction of this._resizeDirections) {
+			for (const direction of this._resizeDirections) {
 				if (direction in this._resizeHandle) {
 					if (this.findHandle(this._resizeHandle[direction], e.target)) {
 						return direction;
@@ -254,7 +254,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 
 		const mousePos: NgGridRawPosition = this._getMousePosition(e);
 
-		for (let direction of this._resizeDirections) {
+		for (const direction of this._resizeDirections) {
 			if (this.canResizeInDirection(direction, mousePos)) {
 				return direction;
 			}
@@ -401,7 +401,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 	}
 
 	public getEventOutput(): NgGridItemEvent {
-		return <NgGridItemEvent> {
+		return {
 			col: this._currentPosition.col,
 			height: this._elemHeight,
 			left: this._elemLeft,
@@ -412,7 +412,7 @@ export class NgGridItem implements OnInit, OnDestroy, DoCheck {
 			top: this._elemTop,
 			uid: this.uid,
 			width: this._elemWidth,
-		};
+		} as NgGridItemEvent;
 	}
 
 	public setPosition(x: number, y: number): void {
