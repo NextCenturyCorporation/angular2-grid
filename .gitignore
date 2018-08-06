@@ -4,6 +4,7 @@ demo/**/*.js*
 demo/node-modules/
 demo-dashboard/**/*.js*
 demo-dashboard/node-modules/
+dist/
 node_modules/
 bower_components/
 coverage/
