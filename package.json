@@ -52,6 +52,8 @@
     "main*",
     "modules"
   ],
+  "main": "bundles/NgGrid.umd.min.js",
+  "modules": "main.js",
   "devDependencies": {
     "@angular/compiler": "^6.1.0",
     "@angular/compiler-cli": "^6.1.0",
