@@ -1,13 +1,5 @@
 typings
 npm-debug.log
-dist/*/
-dist/*.js
-dist/*.js.map
-dist/*.ts
-dist/*.css
-dist/*.metadata.json
-dist/LICENSE
-dist/README.md
 demo/**/*.js*
 demo/node-modules/
 demo-dashboard/**/*.js*

@@ -43,11 +43,7 @@
   },
   "homepage": "https://github.com/BTMorton/angular2-grid",
   "files": [
-    "dist/NgGrid*",
-    "dist/js/",
-    "dist/bundles/",
-    "dist/aot/",
-    "dist/typings/"
+    "dist/*"
   ],
   "devDependencies": {
     "@angular/compiler": "^6.1.0",
